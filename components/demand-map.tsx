@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Cloud, CloudRain, TrendingUp, AlertCircle, RefreshCw, Filter, Users } from "lucide-react"
+import { Cloud, CloudRain, RefreshCw, Filter, Users, MapPin, Navigation } from "lucide-react"
 
 interface Hotspot {
   id: string
@@ -193,6 +193,42 @@ const Building = ({
   />
 )
 
+const USER_START_POSITION = { x: 50, y: 60 }
+
+// Function to calculate route that follows streets
+const calculateStreetRoute = (startX: number, startY: number, endX: number, endY: number) => {
+  // Create a path that follows the grid lines on the map
+  // Vertical streets at: 25%, 50%, 75%
+  // Horizontal streets at: 20%, 40%, 60%, 80%
+
+  const verticalStreets = [25, 50, 75]
+  const horizontalStreets = [20, 40, 60, 80]
+
+  // Find closest street intersections
+  const findClosestStreet = (position: number, streets: number[]) => {
+    return streets.reduce((closest, street) =>
+      Math.abs(position - street) < Math.abs(position - closest) ? street : closest,
+    )
+  }
+
+  const startGridX = findClosestStreet(startX, verticalStreets)
+  const startGridY = findClosestStreet(startY, horizontalStreets)
+  const endGridX = findClosestStreet(endX, verticalStreets)
+  const endGridY = findClosestStreet(endY, horizontalStreets)
+
+  // Create waypoints along the street grid
+  const waypoints = [
+    { x: startX, y: startY }, // Start position
+    { x: startGridX, y: startY }, // Move to nearest vertical street
+    { x: startGridX, y: startGridY }, // Move along vertical street
+    { x: endGridX, y: startGridY }, // Move along horizontal street
+    { x: endGridX, y: endY }, // Move to final vertical position
+    { x: endX, y: endY }, // End position
+  ]
+
+  return waypoints.filter((p, i) => i === 0 || p.x !== waypoints[i - 1].x || p.y !== waypoints[i - 1].y)
+}
+
 export default function DemandMap() {
   const [hotspots, setHotspots] = useState<Hotspot[]>(generateHotspots())
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null)
@@ -200,6 +236,11 @@ export default function DemandMap() {
   const [showFilters, setShowFilters] = useState(false)
   const [demandFilter, setDemandFilter] = useState<"all" | "high" | "medium" | "low">("high")
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [activeRoute, setActiveRoute] = useState<{
+    target: Hotspot
+    progress: number
+    waypoints: { x: number; y: number }[]
+  } | null>(null)
 
   useEffect(() => {
     if (!autoRefresh) return
@@ -211,14 +252,30 @@ export default function DemandMap() {
         const updatedSelected = updated.find((h) => h.id === selectedHotspot.id)
         if (updatedSelected) setSelectedHotspot(updatedSelected)
       }
-    }, 15000) // Refresh every 15 seconds
+    }, 15000)
 
     return () => clearInterval(interval)
   }, [autoRefresh, selectedHotspot])
 
+  useEffect(() => {
+    if (!activeRoute) return
+
+    const interval = setInterval(() => {
+      setActiveRoute((prev) => {
+        if (!prev) return null
+        if (prev.progress >= 100) {
+          setTimeout(() => setActiveRoute(null), 2000)
+          return prev
+        }
+        return { ...prev, progress: prev.progress + 2 }
+      })
+    }, 30)
+
+    return () => clearInterval(interval)
+  }, [activeRoute])
+
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 600))
     const updated = generateHotspots()
     setHotspots(updated)
@@ -227,6 +284,13 @@ export default function DemandMap() {
       if (updatedSelected) setSelectedHotspot(updatedSelected)
     }
     setIsRefreshing(false)
+  }
+
+  const handleGoNow = (hotspot: Hotspot) => {
+    const pos = getHotspotPosition(hotspot.id)
+    const waypoints = calculateStreetRoute(USER_START_POSITION.x, USER_START_POSITION.y, pos.x, pos.y)
+    setActiveRoute({ target: hotspot, progress: 0, waypoints })
+    setSelectedHotspot(null)
   }
 
   const filteredHotspots = demandFilter === "all" ? hotspots : hotspots.filter((h) => h.demand === demandFilter)
@@ -265,6 +329,53 @@ export default function DemandMap() {
       default:
         return null
     }
+  }
+
+  const getHotspotPosition = (id: string) => {
+    const positions: { [key: string]: { x: number; y: number } } = {
+      "1": { x: 25, y: 35 },
+      "2": { x: 65, y: 45 },
+      "3": { x: 72, y: 25 },
+      "4": { x: 42, y: 50 },
+      "5": { x: 78, y: 32 },
+      "6": { x: 32, y: 58 },
+      "7": { x: 48, y: 62 },
+      "8": { x: 15, y: 55 },
+    }
+    return positions[id] || { x: 50, y: 50 }
+  }
+
+  // Function to get current position along route path
+  const getRoutePosition = () => {
+    if (!activeRoute) return null
+
+    const waypoints = activeRoute.waypoints
+    const totalDistance = waypoints.reduce((sum, _, i) => {
+      if (i === 0) return 0
+      const dx = waypoints[i].x - waypoints[i - 1].x
+      const dy = waypoints[i].y - waypoints[i - 1].y
+      return sum + Math.sqrt(dx * dx + dy * dy)
+    }, 0)
+
+    const targetDistance = (totalDistance * activeRoute.progress) / 100
+    let currentDistance = 0
+
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const dx = waypoints[i + 1].x - waypoints[i].x
+      const dy = waypoints[i + 1].y - waypoints[i].y
+      const segmentDistance = Math.sqrt(dx * dx + dy * dy)
+
+      if (currentDistance + segmentDistance >= targetDistance) {
+        const t = (targetDistance - currentDistance) / segmentDistance
+        return {
+          x: waypoints[i].x + dx * t,
+          y: waypoints[i].y + dy * t,
+        }
+      }
+      currentDistance += segmentDistance
+    }
+
+    return waypoints[waypoints.length - 1]
   }
 
   return (
@@ -367,21 +478,69 @@ export default function DemandMap() {
           </div>
         )}
 
+        <div
+          className="absolute"
+          style={{
+            left: `${USER_START_POSITION.x}%`,
+            top: `${USER_START_POSITION.y}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div className="relative">
+            <div className="absolute w-12 h-12 bg-blue-500 rounded-full opacity-20 animate-pulse" />
+            <div className="relative w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center border-3 border-cyan-300 shadow-lg shadow-cyan-500">
+              <MapPin size={12} className="text-white" />
+            </div>
+          </div>
+        </div>
+
+        {activeRoute && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
+            <defs>
+              <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#D6FC48" stopOpacity="1" />
+                <stop offset="100%" stopColor="#6729AB" stopOpacity="0.5" />
+              </linearGradient>
+            </defs>
+
+            {/* Full route path (faded) */}
+            <polyline
+              points={activeRoute.waypoints.map((p) => `${p.x}%,${p.y}%`).join(" ")}
+              fill="none"
+              stroke="url(#routeGradient)"
+              strokeWidth="3"
+              opacity="0.3"
+              strokeDasharray="10,5"
+            />
+
+            {/* Animated route progress along waypoints */}
+            {(() => {
+              const currentPos = getRoutePosition()
+              if (!currentPos) return null
+
+              return (
+                <polyline
+                  points={activeRoute.waypoints
+                    .slice(0, activeRoute.waypoints.length - 1)
+                    .map((p) => `${p.x}%,${p.y}%`)
+                    .concat([`${currentPos.x}%,${currentPos.y}%`])
+                    .join(" ")}
+                  fill="none"
+                  stroke="#D6FC48"
+                  strokeWidth="4"
+                  opacity="0.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )
+            })()}
+          </svg>
+        )}
+
         {/* Hotspot indicators with demand areas */}
         <div className="absolute inset-0">
           {filteredHotspots.map((hotspot) => {
-            const positions: { [key: string]: { x: number; y: number } } = {
-              "1": { x: 25, y: 35 },
-              "2": { x: 65, y: 45 },
-              "3": { x: 72, y: 25 },
-              "4": { x: 42, y: 50 },
-              "5": { x: 78, y: 32 },
-              "6": { x: 32, y: 58 },
-              "7": { x: 48, y: 62 },
-              "8": { x: 15, y: 55 },
-            }
-
-            const pos = positions[hotspot.id] || { x: 50, y: 50 }
+            const pos = getHotspotPosition(hotspot.id)
 
             return (
               <div key={hotspot.id}>
@@ -466,6 +625,10 @@ export default function DemandMap() {
             <div className="w-3 h-3 rounded-full bg-[#FF8C42]" />
             <span>Riders active</span>
           </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div className="w-3 h-3 rounded-full bg-blue-500" />
+            <span>Your location</span>
+          </div>
         </div>
       </div>
 
@@ -479,9 +642,10 @@ export default function DemandMap() {
             </div>
           </div>
           <button
-            onClick={() => setSelectedHotspot(bestOpportunity)}
-            className="ml-4 bg-[#D6FC48] text-black px-4 py-2 rounded-lg font-bold whitespace-nowrap hover:bg-[#C5EB37] transition-colors"
+            onClick={() => handleGoNow(bestOpportunity)}
+            className="ml-4 bg-[#D6FC48] text-black px-4 py-2 rounded-lg font-bold whitespace-nowrap hover:bg-[#C5EB37] transition-colors flex items-center gap-2"
           >
+            <Navigation size={16} />
             Go Now
           </button>
         </div>
@@ -505,7 +669,6 @@ export default function DemandMap() {
             </button>
           </div>
 
-          {/* Opportunity cards with live data */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-[#6729AB] rounded-lg p-3 border border-[#8B4DBF]">
               <div className="text-xs text-[#D6FC48] font-semibold mb-1">Order Chance</div>
@@ -532,18 +695,13 @@ export default function DemandMap() {
             </div>
           </div>
 
-          {/* Action */}
-          {selectedHotspot.orderChance > 80 ? (
-            <button className="w-full bg-[#D6FC48] text-black font-bold py-3 rounded-lg hover:bg-[#C5EB37] transition-colors flex items-center justify-center gap-2">
-              <TrendingUp size={18} />
-              Go There Now
-            </button>
-          ) : (
-            <button className="w-full bg-[#2A2A2A] text-[#D6FC48] font-bold py-3 rounded-lg hover:bg-[#333333] transition-colors flex items-center justify-center gap-2">
-              <AlertCircle size={18} />
-              Explore Other Areas
-            </button>
-          )}
+          <button
+            onClick={() => handleGoNow(selectedHotspot)}
+            className="w-full bg-[#D6FC48] text-black font-bold py-3 rounded-lg hover:bg-[#C5EB37] transition-colors flex items-center justify-center gap-2"
+          >
+            <Navigation size={18} />
+            Go There Now
+          </button>
         </div>
       )}
     </div>
