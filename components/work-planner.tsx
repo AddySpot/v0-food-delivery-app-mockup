@@ -11,16 +11,24 @@ interface ScheduleDay {
   recommendation: string
   confidence: number
   reasoning: string
+  district: string
 }
 
 interface PlanningMode {
   mode: "input" | "result" | "loading"
   hoursPerWeek: number
   strategy: "maximize" | "weather" | "balanced"
+  distance: "nearby" | "traffic" | "whole"
   userLocation?: string
 }
 
-const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
+const generateAISchedule = (hours: number, strategy: string, distance: string): ScheduleDay[] => {
+  const districtsByDistance = {
+    nearby: ["Kreuzberg", "Friedrichshain", "Prenzlauer Berg"],
+    traffic: ["Charlottenburg", "Wedding", "Mitte"],
+    whole: ["Steglitz", "Neukölln", "Spandau", "Mitte"],
+  }
+
   const baseSchedule = {
     maximize: [
       {
@@ -31,6 +39,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Not ideal",
         confidence: 85,
         reasoning: "Lower demand",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Tuesday",
@@ -40,6 +49,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Perfect!",
         confidence: 98,
         reasoning: "Rainy = more orders. Peak times.",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Wednesday",
@@ -49,6 +61,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Good",
         confidence: 92,
         reasoning: "Dinner rush hours",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Thursday",
@@ -58,6 +71,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Good",
         confidence: 88,
         reasoning: "Evening rush",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Friday",
@@ -67,6 +83,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Excellent",
         confidence: 95,
         reasoning: "Weekend starts. High demand.",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][2] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Saturday",
@@ -76,6 +95,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Very good",
         confidence: 90,
         reasoning: "Weekend activity high",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Sunday",
@@ -85,6 +107,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Fair",
         confidence: 80,
         reasoning: "Demand drops",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
     ],
     weather: [
@@ -96,6 +119,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Nice",
         confidence: 88,
         reasoning: "Clear morning",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Tuesday",
@@ -105,6 +129,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Great",
         confidence: 85,
         reasoning: "Perfect conditions",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Wednesday",
@@ -114,6 +141,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "OK",
         confidence: 82,
         reasoning: "No rain",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Thursday",
@@ -123,6 +151,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Very good",
         confidence: 88,
         reasoning: "Evening clear",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Friday",
@@ -132,6 +163,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Good",
         confidence: 84,
         reasoning: "No rain",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][2] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Saturday",
@@ -141,6 +175,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Best",
         confidence: 92,
         reasoning: "Perfect weather all day",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Sunday",
@@ -150,6 +187,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Day off",
         confidence: 100,
         reasoning: "Recovery day",
+        district: "-",
       },
     ],
     balanced: [
@@ -161,6 +199,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Good",
         confidence: 88,
         reasoning: "Balanced: good pay + comfort",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Tuesday",
@@ -170,6 +209,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Very good",
         confidence: 90,
         reasoning: "Strong demand",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Wednesday",
@@ -179,6 +221,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Very good",
         confidence: 87,
         reasoning: "Good balance",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Thursday",
@@ -188,6 +231,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Excellent",
         confidence: 89,
         reasoning: "Peak hours",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Friday",
@@ -197,6 +243,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Excellent",
         confidence: 94,
         reasoning: "High demand + nice weather",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][2] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Saturday",
@@ -206,6 +255,9 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Very good",
         confidence: 91,
         reasoning: "Good conditions",
+        district:
+          districtsByDistance[distance as keyof typeof districtsByDistance][1] ||
+          districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
       {
         day: "Sunday",
@@ -215,6 +267,7 @@ const generateAISchedule = (hours: number, strategy: string): ScheduleDay[] => {
         recommendation: "Good",
         confidence: 85,
         reasoning: "Comfort + income mix",
+        district: districtsByDistance[distance as keyof typeof districtsByDistance][0],
       },
     ],
   }
@@ -234,6 +287,7 @@ export default function WorkPlanner() {
     mode: "input",
     hoursPerWeek: 20,
     strategy: "balanced",
+    distance: "traffic",
   })
   const [projectedIncome, setProjectedIncome] = useState(0)
   const [schedule, setSchedule] = useState<ScheduleDay[]>([])
@@ -242,7 +296,7 @@ export default function WorkPlanner() {
     setState((prev) => ({ ...prev, mode: "loading" }))
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
-    const newSchedule = generateAISchedule(state.hoursPerWeek, state.strategy)
+    const newSchedule = generateAISchedule(state.hoursPerWeek, state.strategy, state.distance)
     setSchedule(newSchedule)
 
     const baseIncome = state.strategy === "maximize" ? 45 : state.strategy === "weather" ? 38 : 42
@@ -299,6 +353,41 @@ export default function WorkPlanner() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-2xl font-bold text-[#D6FC48]">How far to go?</label>
+
+              {[
+                {
+                  id: "nearby",
+                  title: "Near Home",
+                  description: "2-3 km radius",
+                },
+                {
+                  id: "traffic",
+                  title: "Usual Area",
+                  description: "4-5 km radius",
+                },
+                {
+                  id: "whole",
+                  title: "Whole City",
+                  description: "10+ km radius",
+                },
+              ].map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => setState({ ...state, distance: option.id as "nearby" | "traffic" | "whole" })}
+                  className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
+                    state.distance === option.id
+                      ? "border-[#D6FC48] bg-[#6729AB] bg-opacity-30"
+                      : "border-[#2A2A2A] bg-[#1E1E1E] hover:border-[#3A3A3A]"
+                  }`}
+                >
+                  <p className="font-bold text-xl">{option.title}</p>
+                  <p className="text-lg text-[#8B8B8B]">{option.description}</p>
+                </button>
+              ))}
             </div>
 
             <div className="space-y-3">
@@ -386,9 +475,9 @@ export default function WorkPlanner() {
                           <Clock size={18} />
                           {day.timeSlots}
                         </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-3xl font-bold text-[#D6FC48]">{day.profitChance}%</p>
+                        <p className="text-lg text-[#D6FC48] font-bold mt-1">
+                          {day.profitChance}% chance at {day.district}
+                        </p>
                       </div>
                     </div>
 
